@@ -297,7 +297,7 @@ void init_input() {
 
     // If we have no keybindings, add a few simple defaults.
     if (mapping_list.empty()) {
-        input_mapping_add(L"", L"self-insert");
+        input_mapping_add(L"\xE000", L"self-insert");
         input_mapping_add(L"\n", L"execute");
         input_mapping_add(L"\r", L"execute");
         input_mapping_add(L"\t", L"complete");
@@ -405,28 +405,41 @@ static void input_mapping_execute(const input_mapping_t &m, bool allow_commands)
 }
 
 /// Try reading the specified function mapping.
+/// Try reading the specified function mapping.
 static bool input_mapping_is_match(const input_mapping_t &m) {
     wchar_t c = 0;
     int j;
 
     debug(4, L"trying to match mapping %ls", escape_string(m.seq.c_str(), ESCAPE_ALL).c_str());
     const wchar_t *str = m.seq.c_str();
-    for (j = 0; str[j] != L'\0'; j++) {
-        bool timed = (j > 0 && iswcntrl(str[0]));
 
+    if (str[0] == L'\0')
+    {
+        bool timed = (j > 0 && iswcntrl(str[0]));
         c = input_common_readch(timed);
-        if (str[j] != c) {
-            break;
+        if (str[j] == c)
+          return true;
+    }
+    else
+    {
+        for (j = 0; str[j] != L'\0'; j++) {
+          bool timed = (j > 0 && iswcntrl(str[0]));
+
+          c = input_common_readch(timed);
+          if (str[j] != c) {
+              break;
+          }
+        }
+
+        if (str[j] == L'\0') {
+          // debug(0, L"matched mapping %ls (%ls)\n", escape_string(m.seq.c_str(),
+          // ESCAPE_ALL).c_str(),
+          // m.command.c_str());
+          // We matched the entire sequence.
+          return true;
         }
     }
 
-    if (str[j] == L'\0') {
-        // debug(0, L"matched mapping %ls (%ls)\n", escape_string(m.seq.c_str(),
-        // ESCAPE_ALL).c_str(),
-        // m.command.c_str());
-        // We matched the entire sequence.
-        return true;
-    }
 
     // Reinsert the chars we read to be read again since we didn't match the bind sequence (i.e.,
     // the input mapping).
@@ -458,7 +471,7 @@ static void input_mapping_execute_matching_or_generic(bool allow_commands) {
             continue;
         }
 
-        if (m.seq.length() == 0) {
+        if (m.seq == L"\xE000") {
             generic = &m;
         } else if (input_mapping_is_match(m)) {
             input_mapping_execute(m, allow_commands);

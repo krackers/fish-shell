@@ -139,7 +139,7 @@ function __fish_shared_key_bindings -d "Bindings shared between emacs and vi mod
     # This sequence ends paste-mode and returns to the previous mode we have saved before.
     bind -M paste \e\[201~ '__fish_stop_bracketed_paste'
     # In paste-mode, everything self-inserts except for the sequence to get out of it
-    bind -M paste "" self-insert
+    bind -M paste \uE000 self-insert
     # Without this, a \r will overwrite the other text, rendering it invisible - which makes the exercise kinda pointless.
     # TODO: Test this in windows (\r\n line endings)
     bind -M paste \r "commandline -i \n"
