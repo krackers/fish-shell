@@ -48,6 +48,17 @@ typedef int tputs_arg_t;
 typedef char tputs_arg_t;
 #endif
 
+/// thread_local support.
+#if HAVE_CX11_THREAD_LOCAL
+# define FISH_THREAD_LOCAL thread_local
+#elif defined (__GNUC__)
+# define FISH_THREAD_LOCAL __thread
+#elif defined (_MSC_VER)
+# define FISH_THREAD_LOCAL __declspec(thread)
+#else // !C++11 && !__GNUC__ && !_MSC_VER
+# error "No known thread local storage qualifier for this platform"
+#endif
+
 #ifndef HAVE_WINSIZE
 /// Structure used to get the size of a terminal window.
 struct winsize {
