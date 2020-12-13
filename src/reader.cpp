@@ -3298,8 +3298,14 @@ maybe_t<wcstring> reader_data_t::readline(int nchars_or_0) {
                 // This character is skipped.
             } else if (!fish_reserved_codepoint(c) && (c >= L' ' || c == L'\n' || c == L'\r') &&
                        c != 0x7F) {
+                
+                if (is_navigating_pager_contents()) {
+                    pager.set_search_field_shown(true);
+                }
+                
                 // Regular character.
                 editable_line_t *el = active_edit_line();
+                
                 insert_char(active_edit_line(), c);
 
                 // End paging upon inserting into the normal command line.
