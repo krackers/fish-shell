@@ -490,6 +490,6 @@ static uint64_t next_thread_id() {
 }
 
 uint64_t thread_id() {
-    static thread_local uint64_t tl_tid = next_thread_id();
+    static FISH_THREAD_LOCAL uint64_t tl_tid = next_thread_id();
     return tl_tid;
 }
