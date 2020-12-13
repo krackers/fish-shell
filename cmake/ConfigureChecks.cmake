@@ -196,6 +196,16 @@ int main () {
   HAVE_STD__MAKE_UNIQUE
 )
 
+# Detect support for thread_local.
+check_cxx_source_compiles("
+int main () {
+  static thread_local int x = 3;
+  (void)x;
+}
+"
+  HAVE_CX11_THREAD_LOCAL
+)
+
 FIND_PROGRAM(SED sed)
 
 CHECK_CXX_SOURCE_COMPILES("
