@@ -756,11 +756,6 @@ static void color_string_internal(const wcstring &buffstr, highlight_spec_t base
             }
         }
     }
-
-    // Error on unclosed quotes.
-    if (unclosed_quote_offset) {
-        colors[*unclosed_quote_offset] = highlight_role_t::error;
-    }
 }
 
 /// Syntax highlighter helper.
@@ -812,8 +807,7 @@ class highlighter_t {
           color_array(str.size()) {
         // Parse the tree.
         parse_tree_from_string(buff,
-                               parse_flag_continue_after_error | parse_flag_include_comments |
-                                   parse_flag_accept_incomplete_tokens,
+                               parse_flag_continue_after_error | parse_flag_include_comments,
                                &this->parse_tree, nullptr);
     }
 
