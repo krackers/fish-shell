@@ -807,7 +807,7 @@ class highlighter_t {
           color_array(str.size()) {
         // Parse the tree.
         parse_tree_from_string(buff,
-                               parse_flag_continue_after_error | parse_flag_include_comments,
+                               parse_flag_continue_after_error | parse_flag_include_comments | parse_flag_accept_incomplete_tokens,
                                &this->parse_tree, nullptr);
     }
 
