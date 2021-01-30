@@ -68,8 +68,10 @@ tok_t tokenizer_t::call_error(tokenizer_error_t error_type, const wchar_t *token
     // If continue_after_error is set and we have a real token length, then skip past it.
     // Otherwise give up.
     if (token_length.has_value() && continue_after_error) {
-        assert(this->token_cursor < error_loc + *token_length && "Unable to continue past error");
-        this->token_cursor = error_loc + *token_length;
+        if(this->token_cursor < error_loc + *token_length)
+            this->token_cursor = error_loc + *token_length;
+        else
+            this->has_next = false;
     } else {
         this->has_next = false;
     }
