@@ -320,10 +320,24 @@ class reader_history_search_t {
     }
 };
 
-struct autosuggestion_result_t {
-    wcstring suggestion;
+/// The result of an autosuggestion computation.
+struct autosuggestion_t {
+    // The text to use, as an extension of the command line.
+    wcstring text;
+
+    // The string which was searched for.
     wcstring search_string;
+
+    // Clear our contents.
+    void clear() {
+        text.clear();
+        search_string.clear();
+    }
+
+    // \return whether we have empty text.
+    bool empty() const { return text.empty(); }
 };
+ 
 
 struct highlight_result_t {
     std::vector<highlight_spec_t> colors;
@@ -343,7 +357,7 @@ class reader_data_t : public std::enable_shared_from_this<reader_data_t> {
     /// String containing the whole current commandline.
     editable_line_t command_line;
     /// String containing the autosuggestion.
-    wcstring autosuggestion;
+    autosuggestion_t autosuggestion;
     /// Current pager.
     pager_t pager;
     /// Current page rendering.
@@ -473,7 +487,7 @@ class reader_data_t : public std::enable_shared_from_this<reader_data_t> {
     void completion_insert(const wchar_t *val, size_t token_end, complete_flags_t flags);
 
     bool can_autosuggest() const;
-    void autosuggest_completed(autosuggestion_result_t result);
+    void autosuggest_completed(autosuggestion_t result);
     void update_autosuggestion();
     void accept_autosuggestion(bool full, move_word_style_t style = move_word_style_punctuation);
     void super_highlight_me_plenty(int highlight_pos_adjust = 0, bool no_io = false);
@@ -622,7 +636,7 @@ void reader_data_t::repaint() {
         full_line = wcstring(cmd_line->text.length(), get_obfuscation_read_char());
     } else {
         // Combine the command and autosuggestion into one string.
-        full_line = combine_command_and_autosuggestion(cmd_line->text, autosuggestion);
+        full_line = combine_command_and_autosuggestion(cmd_line->text, autosuggestion.text);
     }
 
     size_t len = full_line.size();
@@ -1278,7 +1292,7 @@ static bool may_add_to_history(const wcstring &commandline_prefix) {
 
 // Returns a function that can be invoked (potentially
 // on a background thread) to determine the autosuggestion
-static std::function<autosuggestion_result_t(void)> get_autosuggestion_performer(
+static std::function<autosuggestion_t(void)> get_autosuggestion_performer(
     parser_t &parser, const wcstring &search_string, size_t cursor_pos, history_t *history) {
     const unsigned int generation_count = read_generation_count();
     auto vars = parser.vars().snapshot();
@@ -1286,9 +1300,9 @@ static std::function<autosuggestion_result_t(void)> get_autosuggestion_performer
     // TODO: suspicious use of 'history' here
     // This is safe because histories are immortal, but perhaps
     // this should use shared_ptr
-    return [=]() -> autosuggestion_result_t {
+    return [=]() -> autosuggestion_t {
         ASSERT_IS_BACKGROUND_THREAD();
-        const autosuggestion_result_t nothing = {};
+        const autosuggestion_t nothing = {};
         operation_context_t ctx = get_bg_context(vars, generation_count);
         if (ctx.check_cancel()) {
             return nothing;
@@ -1354,12 +1368,12 @@ bool reader_data_t::can_autosuggest() const {
 }
 
 // Called after an autosuggestion has been computed on a background thread
-void reader_data_t::autosuggest_completed(autosuggestion_result_t result) {
-    if (!result.suggestion.empty() && can_autosuggest() &&
+void reader_data_t::autosuggest_completed(autosuggestion_t result) {
+    if (!result.empty() && can_autosuggest() &&
         result.search_string == command_line.text &&
-        string_prefixes_string_case_insensitive(result.search_string, result.suggestion)) {
+        string_prefixes_string_case_insensitive(result.search_string, result.text)) {
         // Autosuggestion is active and the search term has not changed, so we're good to go.
-        autosuggestion = std::move(result.suggestion);
+        autosuggestion = std::move(result);
         sanity_check();
         repaint();
     }
@@ -1373,7 +1387,7 @@ void reader_data_t::update_autosuggestion() {
         const editable_line_t *el = active_edit_line();
         auto performer = get_autosuggestion_performer(parser(), el->text, el->position, history);
         auto shared_this = this->shared_from_this();
-        iothread_perform(performer, [shared_this](autosuggestion_result_t result) {
+        iothread_perform(performer, [shared_this](autosuggestion_t result) {
             shared_this->autosuggest_completed(std::move(result));
         });
     }
@@ -1389,12 +1403,12 @@ void reader_data_t::accept_autosuggestion(bool full, move_word_style_t style) {
         // Accept the autosuggestion.
         if (full) {
             // Just take the whole thing.
-            command_line.text = autosuggestion;
+            command_line.text = autosuggestion.text;
         } else {
             // Accept characters according to the specified style.
             move_word_state_machine_t state(style);
-            for (size_t idx = command_line.size(); idx < autosuggestion.size(); idx++) {
-                wchar_t wc = autosuggestion.at(idx);
+            for (size_t idx = command_line.size(); idx < autosuggestion.text.size(); idx++) {
+                wchar_t wc = autosuggestion.text.at(idx);
                 if (!state.consume_char(wc)) break;
                 command_line.text.push_back(wc);
             }
@@ -2084,9 +2098,9 @@ void reader_data_t::super_highlight_me_plenty(int match_highlight_pos_adjust, bo
     // Here's a hack. Check to see if our autosuggestion still applies; if so, don't recompute it.
     // Since the autosuggestion computation is asynchronous, this avoids "flashing" as you type into
     // the autosuggestion.
-    const wcstring &cmd = el->text, &suggest = autosuggestion;
-    if (can_autosuggest() && !suggest.empty() &&
-        string_prefixes_string_case_insensitive(cmd, suggest)) {
+    const wcstring &cmd = el->text;
+    if (can_autosuggest() && !autosuggestion.empty() &&
+        string_prefixes_string_case_insensitive(cmd, autosuggestion.text)) {
         // the autosuggestion is still reasonable, so do nothing
     } else {
         update_autosuggestion();
@@ -2813,7 +2827,7 @@ void reader_data_t::handle_readline_command(readline_cmd_t c, readline_loop_stat
                     history_search.reset_to_mode(el->text, history, mode);
 
                     // Skip the autosuggestion in the history unless it was truncated.
-                    const wcstring &suggest = autosuggestion;
+                    const wcstring &suggest = autosuggestion.text;
                     if (!suggest.empty() && !screen.autosuggestion_is_truncated &&
                         mode != reader_history_search_t::prefix) {
                         history_search.add_skip(suggest);
