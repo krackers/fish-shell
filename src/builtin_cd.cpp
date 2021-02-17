@@ -69,10 +69,8 @@ int builtin_cd(parser_t &parser, io_streams_t &streams, wchar_t **argv) {
     }
     const wcstring &dir = *mdir;
 
-    wcstring norm_dir = normalize_path(dir);
-
     // We need to keep around the fd for this directory, in the parser.
-    autoclose_fd_t dir_fd(wopen_cloexec(norm_dir, O_RDONLY));
+    autoclose_fd_t dir_fd(wopen_cloexec(dir, O_RDONLY));
     bool success = dir_fd.valid() && fchdir(dir_fd.fd()) == 0;
 
     if (!success) {
@@ -95,9 +93,15 @@ int builtin_cd(parser_t &parser, io_streams_t &streams, wchar_t **argv) {
 
     parser.libdata().cwd_fd = std::make_shared<const autoclose_fd_t>(std::move(dir_fd));
     std::vector<event_t> evts;
-    parser.vars().set_one(L"PWD", ENV_EXPORT | ENV_GLOBAL, std::move(norm_dir), &evts);
-    for (const auto &evt : evts) {
-        event_fire(parser, evt);
+    wcstring cwd = wgetcwd();
+    if (cwd.empty()) {
+         debug(0,
+              _(L"Could not determine current working directory. Is your locale set correctly?"));
+    } else {
+        parser.vars().set_one(L"PWD", ENV_EXPORT | ENV_GLOBAL, std::move(cwd), &evts);
+        for (const auto &evt : evts) {
+            event_fire(parser, evt);
+        }
     }
     return STATUS_CMD_OK;
 }
