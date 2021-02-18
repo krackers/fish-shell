@@ -1894,11 +1894,17 @@ string_fuzzy_match_t::string_fuzzy_match_t(enum fuzzy_match_type_t t, size_t dis
     : type(t), match_distance_first(distance_first), match_distance_second(distance_second) {}
 
 string_fuzzy_match_t string_fuzzy_match_string(const wcstring &string,
-                                               const wcstring &match_against,
+                                               const wcstring &match_against_pre,
                                                fuzzy_match_type_t limit_type) {
     bool all_lower = true;
     for (wchar_t c : string) {
        if (towlower(c) != c) all_lower = false;
+    }
+    wcstring match_against = match_against_pre;
+    if (all_lower) {
+      std::transform(match_against.begin(), match_against.end(),
+             match_against.begin(),
+             towlower);
     }
     // Distances are generally the amount of text not matched.
     string_fuzzy_match_t result(fuzzy_match_none, 0, 0);
