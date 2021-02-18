@@ -1896,6 +1896,10 @@ string_fuzzy_match_t::string_fuzzy_match_t(enum fuzzy_match_type_t t, size_t dis
 string_fuzzy_match_t string_fuzzy_match_string(const wcstring &string,
                                                const wcstring &match_against,
                                                fuzzy_match_type_t limit_type) {
+    bool all_lower = true;
+    for (wchar_t c : string) {
+       if (towlower(c) != c) all_lower = false;
+    }
     // Distances are generally the amount of text not matched.
     string_fuzzy_match_t result(fuzzy_match_none, 0, 0);
     size_t location;
@@ -1907,10 +1911,10 @@ string_fuzzy_match_t string_fuzzy_match_string(const wcstring &string,
         result.match_distance_first = match_against.size() - string.size();
     } else if (limit_type >= fuzzy_match_case_insensitive &&
                wcscasecmp(string.c_str(), match_against.c_str()) == 0) {
-        result.type = fuzzy_match_case_insensitive;
+        result.type = all_lower ? fuzzy_match_exact : fuzzy_match_case_insensitive;
     } else if (limit_type >= fuzzy_match_prefix_case_insensitive &&
                string_prefixes_string_case_insensitive(string, match_against)) {
-        result.type = fuzzy_match_prefix_case_insensitive;
+        result.type = all_lower ? fuzzy_match_prefix : fuzzy_match_prefix_case_insensitive;
         assert(match_against.size() >= string.size());
         result.match_distance_first = match_against.size() - string.size();
     } else if (limit_type >= fuzzy_match_substring &&
@@ -1923,7 +1927,7 @@ string_fuzzy_match_t string_fuzzy_match_string(const wcstring &string,
     } else if (limit_type >= fuzzy_match_substring_case_insensitive &&
                (location = ifind(match_against, string, true)) != wcstring::npos) {
         // A case-insensitive version of the string is in the match against.
-        result.type = fuzzy_match_substring_case_insensitive;
+        result.type = all_lower ? fuzzy_match_substring : fuzzy_match_substring_case_insensitive;
         assert(match_against.size() >= string.size());
         result.match_distance_first = match_against.size() - string.size();
         result.match_distance_second = location;  // prefer earlier matches
